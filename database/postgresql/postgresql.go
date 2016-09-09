@@ -19,36 +19,32 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
  * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package web
+package postgresql
 
 import (
-	"net/http"
-	"strings"
+	"log"
+	"os"
+	"sync"
 
-	"github.com/gorilla/schema"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
-// FillValuesFromForm serve per riempire la struttura passata con i campi relativi presenti nel form
-func FillValuesFromForm(i interface{}, r *http.Request) error {
-	decoder := schema.NewDecoder()
-	// Parse the body depending on the content type.
-	contentType := strings.ToLower(strings.TrimSpace(strings.Split(r.Header.Get("Content-Type"), ";")[0]))
-	switch contentType {
-	case "application/x-www-form-urlencoded":
-		// Typical form.
-		if err := r.ParseForm(); err != nil {
-			return err
-		}
-		decoder.Decode(i, r.Form)
+// POSTGRESQL
+var DB *sqlx.DB
+var once sync.Once
 
-	case "multipart/form-data":
-		// Multipart form.
-		// TODO: Extract the multipart form param so app can set it.
-		if err := r.ParseMultipartForm(32 << 20 /* 32 MB */); err != nil {
-			return err
+func GetDB() *sqlx.DB {
+	once.Do(func() {
+		var err error
+		DB, err = sqlx.Open("postgres", os.Getenv("DATABASE_URL"))
+		if err != nil {
+			log.Fatalln(err)
 		}
-		decoder.Decode(i, r.MultipartForm.Value)
-	}
 
-	return nil
+		if err = DB.Ping(); err != nil {
+			log.Fatalln(err)
+		}
+	})
+	return DB
 }
